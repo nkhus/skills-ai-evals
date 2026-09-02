@@ -1,0 +1,3 @@
+{"id":"ideal-behavior","record":{"id":"fixture-record-ideal","input":{},"expected":{}},"artifact":{},"expected_grade":{"status":"scored","score_min":1.0,"score_max":1.0}}
+{"id":"clear-failure","record":{"id":"fixture-record-failure","input":{},"expected":{}},"artifact":{},"expected_grade":{"status":"scored","score_min":0.0,"score_max":0.0}}
+{"id":"invalid-artifact","record":{"id":"fixture-record-invalid","input":{},"expected":{}},"artifact":{},"expected_grade":{"status":"invalid_artifact","score":null}}

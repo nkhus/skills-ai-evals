@@ -1,0 +1,11 @@
+component: {{ component_name }}
+criteria:
+  - id: {{ criterion_id }}
+    name: {{ criterion_name }}
+    group: {{ basic_or_quality }}
+    priority: {{ p0_p1_p2 }}
+    intent: >
+      {{ high_level_intent }}
+    # Remove this field when no boundary clarification is needed.
+    out_of_scope:
+      - {{ excluded_behavior }}
