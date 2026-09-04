@@ -1,150 +1,140 @@
-# Metric Design
+# Metric Design Guide
 
-## Purpose
-
-Define measurements that faithfully represent one approved criterion and remain
-interpretable across dataset records and runs.
-
-## Separate four concepts
-
-### Criterion
-
-The behavioral quality being evaluated.
-
-Example:
+Metrics are generic, reusable statistical aggregations over grader outputs. They do not carry criterion semantics.
 
 ```text
-Retrieval coverage
+criterion-specific behavior
+        ↓
+grader
+        ↓
+Grade(label / value / status)
+        ↓
+generic metric
 ```
 
-### Primary metric
+Criterion-specific semantics belong to the grader. The metric must not reinterpret component behavior.
 
-The main quantitative or categorical representation of the criterion.
+## Prefer pre-implemented generic metrics
 
-Example:
+Select from the reusable framework metric set instead of designing custom aggregation formulas.
+
+Initial shared set:
 
 ```text
-Recall at K
+mean
+median
+accuracy
+precision
+recall
+f1
+label_rate
+status_rate
 ```
 
-### Supporting metrics
+The set may later grow with other established generic metrics (for example macro/micro classification metrics, ROC-AUC, NDCG, MRR, MAP) when they become necessary.
 
-Secondary measurements that explain or complement the primary metric without
-becoming separate criteria.
+If an approved criterion needs an established generic metric that is missing, identify the required generic semantics so it can be added to the shared framework metric package. Do not design a criterion-specific formula as a substitute.
 
-Examples:
-
-- full-coverage rate;
-- missing-required-item count;
-- partial-credit score.
-
-### Diagnostics
-
-Debugging signals that help understand results but do not represent quality by
-themselves.
-
-Examples:
-
-- number of returned items;
-- duplicate count;
-- judge retry count;
-- unsupported claim list.
-
-Do not promote every metric or diagnostic into a criterion.
-
-## Record-level metric contract
-
-For every metric define:
-
-- name;
-- meaning;
-- value type;
-- range or allowed labels;
-- whether higher or lower is better;
-- exact computation or rubric interpretation;
-- treatment of partial success;
-- treatment of ties;
-- `not_applicable` behavior;
-- invalid-record behavior;
-- invalid-artifact behavior.
-
-Do not convert infrastructure failures into legitimate quality scores.
-
-## Dataset-level aggregation
-
-Define how record-level values are summarized, for example:
-
-- arithmetic mean;
-- median;
-- percentile;
-- success rate;
-- macro average;
-- micro average;
-- pairwise win rate;
-- distribution of rubric labels.
-
-Choose aggregation based on meaning, not convenience.
-
-### Macro versus micro
-
-Use macro aggregation when each record or category should contribute equally.
-Use micro aggregation when individual units inside records should contribute
-proportionally.
-
-Document which is used and why.
-
-### Missing and not-applicable values
-
-Specify whether these values are:
-
-- excluded from the denominator;
-- reported separately;
-- considered dataset-design defects;
-- considered grader failures.
-
-Never silently drop them.
-
-## Score interpretation
-
-Explain what high, medium, and low values mean behaviorally. Avoid definitions
-that merely repeat numeric ranges.
-
-Example:
+Example mappings:
 
 ```text
-A score of 1 means every required source was present within the first K results.
-A score between 0 and 1 means only part of the required evidence was retrieved.
-A score of 0 means none of the required evidence was retrieved.
+tool selection semantics
+→ grader emits correct / incorrect
+→ accuracy
 ```
 
-## Dataset dependence
+```text
+semantic relevance
+→ grader emits numeric relevance value
+→ mean
+```
 
-Every aggregate is conditional on dataset composition. Document important
-sources of distortion:
+```text
+classification
+→ grader emits predicted label
+→ accuracy / precision / recall / f1
+```
 
-- overrepresentation of easy examples;
-- repeated near-duplicates;
-- unbalanced intents or languages;
-- missing no-action or unanswerable cases;
-- incomplete expected labels;
-- judge-friendly references that do not represent production behavior.
+## Metric inputs
 
-## Basic and Quality are not metric types
+Standard conventions:
 
-A `basic` criterion may use partial credit or an LLM judge.
+```text
+numeric quality          → Grade.value
+categorical prediction   → Grade.label
+classification reference → TestCase.expected["label"]
+classification prediction → Grade.label
+```
 
-A `quality` criterion may use a deterministic metric.
+For binary `precision`, `recall`, `f1`, the positive label must be explicit.
 
-Choose measurement from the criterion contract and available evidence, not the
-high-level group alone.
+## Primary metric
 
-## Thresholds are out of scope
+Choose one primary generic metric that best represents criterion performance. Do not invent equivalent metrics unnecessarily.
 
-This stage defines what a score means. It does not decide:
+## Supporting metrics
 
-- pass/fail thresholds;
-- release gates;
-- acceptable regression deltas;
-- suite-specific policy.
+Add supporting metrics only when they materially improve interpretation, for example:
 
-Those decisions belong to policy and suite configuration.
+```text
+status rate
+label distribution
+scored coverage
+error rate
+```
+
+## Non-scored results
+
+Quality metrics normally operate only on `Grade.status == "scored"`.
+
+Never silently convert `not_applicable` or `error` into quality score `0`.
+
+## Slices
+
+A slice is the same generic metric applied to a subset of cases:
+
+```text
+accuracy
+accuracy[ambiguous_request]
+accuracy[multi_turn]
+```
+
+Do not define a separate metric merely because a slice exists.
+
+## Keep metric design minimal
+
+Specify only what downstream implementation cannot infer automatically.
+
+```yaml
+primary:
+  metric: accuracy
+
+supporting:
+  - metric: status_rate
+    status: error
+
+slices:
+  - ambiguous_request
+```
+
+or:
+
+```yaml
+primary:
+  metric: mean
+  source: grade.value
+```
+
+Do not restate standard mathematical definitions, ranges, or implementation details that are intrinsic to a known generic metric.
+
+## Implementation handoff
+
+Metric design is complete when downstream stages do not need to invent semantic evaluation choices:
+
+- which generic metric(s) to use;
+- the primary metric;
+- supporting metrics, if any;
+- treatment of non-scored statuses;
+- important slices.
+
+Metric design does not own grader semantics, dataset construction, execution grouping, release thresholds, acceptance policy, or execution configuration.

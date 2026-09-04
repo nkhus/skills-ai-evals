@@ -1,9 +1,0 @@
-name: local
-
-selection:
-  components:
-    - "{{ component }}"
-  priorities:
-    - p0
-  dataset_groups:
-    - baseline

@@ -1,299 +1,109 @@
 ---
 name: evals-criterion-design
-description: Detail one approved component evaluation criterion into a complete semantic, metric, dataset, grader, and execution-artifact design. Use after criteria discovery and before implementation.
+description: Design one approved evaluation criterion into an implementation-ready grader, metrics, dataset contract, and observability requirements.
 user-invocable: false
 ---
 
 # Evals Criterion Design
 
-## Objective
+## Purpose
 
-Turn one approved high-level criterion into an implementation-ready design.
+Turn one approved criterion into a complete evaluation design without making implementation decisions.
 
-One invocation handles exactly one criterion.
+Implementation should not need to invent semantic evaluation choices.
 
-This stage answers:
-
-- what the criterion precisely means;
-- what behavior is good, bad, acceptable, or not applicable;
-- how the behavior is measured;
-- which metrics and diagnostics are produced;
-- which examples and fields the criterion-owned datasets require;
-- which grader design pattern should be implemented;
-- which execution-artifact fields the component runner must provide.
-
-This stage does not implement datasets, graders, runners, manifests, suites, or
-policies.
-
-## Invocation
-
-The orchestrator provides:
-
-- component name;
-- criterion ID.
-
-Example:
+## Input
 
 ```text
-Component: retriever
-Criterion: retrieval_coverage
+Component: {component}
+Criterion: {criterion_id}
 ```
 
-Do not require the orchestrator to pass summaries, decisions, or artifact
-contents. Read previous-stage artifacts directly.
+## Requires
 
-## Required inputs
-
-Before starting, read:
-
-- `evals/config.yaml`;
-- `evals/components/{component}/README.md`;
-- `evals/components/{component}/spec/criteria.yaml`.
-
-Find the requested criterion in `spec/criteria.yaml` and use its approved:
-
-- `id`;
-- `name`;
-- `group`;
-- `priority`;
-- `intent`;
-- optional `out_of_scope`.
-
-If a required file is missing, or the criterion ID is not present, stop and
-report the blocking path or identifier. Do not create or repair prerequisite
-artifacts.
-
-## Context boundary
-
-Read deeply:
-
-- the approved component README;
-- the requested criterion entry;
-- repository code and documentation needed to understand this criterion;
-- an existing draft or final design for this same criterion.
-
-Do not read detailed designs of other criteria by default. You may inspect their
-IDs, names, intents, and brief boundaries only to avoid obvious overlap.
-
-Do not redesign the component or the complete criterion list.
-
-## Working artifact
-
-While the criterion is being discussed, maintain:
-
-- `evals/components/{component}/criterion-design.{criterion_id}.draft.md`
-
-The draft records the current integrated proposal and unresolved decisions. Its
-existence does not complete the stage.
-
-Use `templates/criterion-design-draft.md`.
-
-## Required process
-
-### 1. Confirm the criterion identity
-
-Read the approved criterion entry and restate succinctly:
-
-- what behavior it appears to evaluate;
-- why that behavior matters to the component's functional goal;
-- the most important boundary with adjacent behavior.
-
-Ask a focused question only when the approved intent leaves a material ambiguity
-that repository evidence cannot resolve.
-
-If the criterion is fundamentally invalid, duplicated, or outside the approved
-component boundary, stop and recommend returning to `evals-criteria-discovery`.
-Do not silently redefine the criterion into something different.
-
-### 2. Define the semantic contract
-
-Specify:
-
-- purpose;
-- evaluation question;
-- component responsibility;
-- desired behavior;
-- undesired behavior;
-- acceptable variability;
-- out-of-scope behavior;
-- applicability and not-applicable cases;
-- common and high-consequence failure modes;
-- meaningful edge cases;
-- relationship to the component's functional goal.
-
-Follow `references/criterion-detailing.md`.
-
-The criterion must remain one coherent quality dimension. If the design needs
-several unrelated questions or scores, propose splitting it and return to
-criteria discovery rather than hiding several criteria in one specification.
-
-### 3. Design measurement and metrics
-
-Separate:
-
-- criterion — the quality dimension;
-- primary metric — the main measurement used to represent the criterion;
-- supporting metrics — secondary measurements that explain the main result;
-- diagnostics — debugging information that is not itself a quality measure.
-
-For every metric define:
-
-- record-level value;
-- range or value set;
-- direction of improvement;
-- dataset-level aggregation;
-- interpretation;
-- handling of invalid and not-applicable records;
-- limitations and dependence on dataset composition.
-
-Do not define release thresholds or policy decisions.
-
-Follow `references/metric-design.md`.
-
-### 4. Design criterion-owned datasets
-
-Define the dataset contract for this criterion only.
-
-Every future executable record must have exactly this top-level envelope:
-
-```json
-{
-  "id": "stable-record-id",
-  "input": {},
-  "expected": {}
-}
+```text
+evals/components/{component}/README.md
+evals/components/{component}/spec/criteria.yaml
 ```
 
-Define:
+Require:
 
-- exact fields and semantics under `input`;
-- exact fields and semantics under `expected`;
-- required and optional fields;
-- dataset groups that are actually needed;
-- scenario categories each group must cover;
-- positive, negative, difficult, and regression examples;
-- balance and coverage considerations;
-- invalid-record examples;
-- maintenance rules.
+- component analysis `Status: Approved`;
+- criteria `status: approved`;
+- requested criterion exists in `criteria.yaml`.
 
-Prefer the standard dataset groups when applicable:
+## Workflow
 
-- `baseline`;
-- `corner_cases`;
-- `regression`.
+1. Read the approved component analysis and requested criterion.
+2. Preserve the approved criterion `id`, `intent`, and optional `boundary`.
+3. Resolve only ambiguities that materially affect evaluation semantics. If the criterion itself must change, return to criteria discovery.
+4. Read `references/grader-design.md` and design the case-level grader.
+5. Read `references/metric-design.md` and select suitable generic pre-implemented metric(s) from grader outputs. If an appropriate established generic metric is missing, identify the required generic metric semantics for later addition to the shared framework instead of designing a criterion-specific formula.
+6. Read `references/dataset-design.md` and define the test-case contract, coverage, and authoring guidance.
+7. Derive required observability from the grader execution inputs. Require observable facts only; never hidden reasoning.
+8. Create or update:
 
-Do not create JSONL files in this stage.
+```text
+evals/components/{component}/spec/{criterion_id}.md
+```
 
-The runner must be able to execute using `input` without reading `expected`.
+using:
 
-Follow `references/dataset-design.md`.
+```markdown
+# {Criterion}
 
-### 5. Design the grader
+Status: Pending approval
 
-Choose the grader family only after the semantic, metric, and dataset contracts
-are clear:
+## Intent
 
-- `code_based`;
-- `llm_based`;
-- `hybrid`.
+## Grader
 
-Document:
+## Metrics
 
-- design pattern;
-- inputs from the dataset record;
-- required execution-artifact fields;
-- configuration;
-- record-level score calculation;
-- labels, rationale, and evidence;
-- error statuses;
-- not-applicable behavior;
-- determinism and variability;
-- calibration or test-fixture requirements;
-- versioning;
-- known limitations.
+## Dataset
 
-Prefer the simplest reliable grader capable of measuring the approved
-criterion. Do not choose a grader family from the criterion's Basic or Quality
-group alone.
+## Required Observability
 
-Follow `references/grader-design.md`.
+## Limitations
+```
 
-### 6. Define runner artifact requirements
+Omit `Limitations` when none are material.
 
-List only the observable fields the future component runner must persist for
-this grader, for example:
+9. Present the complete design to the user and apply corrections.
+10. After explicit approval, change:
 
-- normalized output;
-- selected route or tool;
-- retrieved item IDs and order;
-- tool-call arguments;
-- relevant trace events;
-- component errors;
-- configuration or version identifiers needed for interpretation.
+```text
+Status: Pending approval
+```
 
-Do not design or implement the runner itself.
+to:
 
-Do not request fields that cannot reasonably be observed. Record missing
-observability as an implementation prerequisite or grader limitation.
+```text
+Status: Approved
+```
 
-### 7. Present one integrated design
-
-Present the complete current proposal together:
-
-- semantic contract;
-- metrics;
-- dataset contract and groups;
-- grader design;
-- execution-artifact requirements;
-- unresolved questions and limitations.
-
-Do not ask the user to approve isolated fragments as though the entire design
-were approved. Iterate as needed and keep the working draft current.
-
-### 8. Obtain explicit approval
-
-Ask the user to explicitly approve the complete design for this criterion.
-
-Do not treat silence, approval of one section, or approval of an earlier draft
-as final approval.
-
-### 9. Write final artifacts
-
-Only after explicit approval, rename drafts into final artifacts and write the completed content to:
-
-- `evals/components/{component}/spec/{criterion_id}.md`;
-- `evals/components/{component}/datasets/{criterion_id}/README.md`;
-- `evals/components/{component}/graders/{criterion_id}.md`.
-
-Use the templates in `templates/` and follow
-`references/output-contract.md`.
-
-Remove the working draft or clearly mark it superseded.
-
-## Stage boundaries
+## Boundary
 
 Do not:
 
-- add, remove, rename, merge, split, or reprioritize entries in
-  `spec/criteria.yaml`;
-- design more than one criterion in one invocation;
-- create executable JSONL datasets;
-- write grader implementation code;
-- write component runner code;
-- create or update the component manifest;
-- update root configuration, suites, or policies;
-- define release gates or thresholds;
-- execute evaluations;
-- repeat broad component analysis.
+- change the approved component analysis or criterion definition;
+- design more than one criterion;
+- create concrete dataset records;
+- implement or execute evaluations;
+- make judge-model, provider/runtime, or execution-policy decisions;
+- define release or acceptance policy.
 
-## Completion
+The design is complete only when downstream stages do not need to invent semantic evaluation choices: what is judged, what grader outputs mean, which generic metrics aggregate them, what cases must represent, or what execution evidence is required.
 
-The stage is complete only when the user explicitly approves the design and all
-three final artifacts exist:
+Different downstream stages consume different parts of the design:
 
-- `evals/components/{component}/spec/{criterion_id}.md`;
-- `evals/components/{component}/datasets/{criterion_id}/README.md`;
-- `evals/components/{component}/graders/{criterion_id}.md`.
+```text
+criterion implementation
+→ grader + generic metric support
 
-Return the component, criterion ID, and created artifact paths. Do not start the
-next pipeline stage.
+dataset authoring
+→ concrete evaluation cases
+
+future runtime
+→ execution / persistence / orchestration
+```

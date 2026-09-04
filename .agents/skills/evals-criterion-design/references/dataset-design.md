@@ -1,190 +1,189 @@
-# Dataset Design
+# Dataset Design Guide
 
-## Purpose
+Design the dataset contract and authoring guidance for one criterion. Do not create concrete test cases.
 
-Define the complete authoring contract for the datasets owned by one criterion.
-The implementation stage will later create the executable JSONL files.
+## Contract
 
-## Criterion-owned datasets
+Use:
 
-Each criterion owns its own dataset directory:
+```yaml
+id: case-id
+input: {}
+expected: {}
+metadata: {} # optional
+```
+
+Ownership model:
 
 ```text
-evals/components/{component}/datasets/{criterion_id}/
+component contract        → input
+grader + metric contracts → expected
+analysis / maintenance    → metadata
 ```
 
-Do not introduce a shared case bank or an annotation join.
+A more general interpretation:
 
-Some scenario duplication across criteria is acceptable because each dataset
-represents a different measurement contract.
+```text
+input
+→ information the real component receives
 
-## Universal record envelope
+expected
+→ reference truth required to evaluate the case
 
-Every executable record contains only:
-
-```json
-{
-  "id": "stable-record-id",
-  "input": {},
-  "expected": {}
-}
+metadata
+→ analysis / maintenance information
 ```
 
-Do not add generic top-level `tags`, `metadata`, `context`, or `annotations`.
+Every field should have a clear consumer.
 
-### `id`
+## Input
 
-A stable, unique identifier used for reporting, caching, comparison, and
-regression tracking.
+`input` must match the real component invocation.
 
-IDs should:
+Include only information the component actually receives, such as:
 
-- remain stable when wording changes but the scenario meaning does not;
-- be unique within the criterion's datasets;
-- use a readable consistent convention;
-- not encode mutable array positions.
+- request;
+- conversation history;
+- state;
+- context;
+- available tools/actions;
+- upstream outputs.
 
-### `input`
+For stateful or multi-turn components, include required history/state directly in `input`.
 
-Everything the component runner needs to execute the scenario.
+Do not add evaluation-only fields, expected answers, grader labels, or grader instructions.
 
-Place criterion-specific execution context inside `input`, for example:
+## Expected
 
-- request or messages;
-- available tools;
-- retrieved context supplied to the component;
-- configuration flags;
-- user or permission context;
-- prior state needed for invocation.
+`expected` contains reference truth required to evaluate the case. It may be consumed:
 
-The runner should not need `expected` to execute the component.
+- directly by the grader;
+- by generic metrics requiring standardized reference truth, for example `TestCase.expected["label"]` as the reference class for classification metrics.
 
-### `expected`
+It may define:
 
-Everything the grader needs to evaluate the execution artifact.
-
-Examples:
-
-- expected class or route;
-- required and forbidden items;
+- expected values;
+- acceptable alternatives;
+- required or forbidden elements;
 - reference facts;
-- relevance judgments;
-- rubric-specific required information;
-- valid action alternatives;
-- source-support mappings.
+- ranges or tolerances;
+- hints/guidance for an LLM judge (e.g. what to look for, why the expected result is correct) when the criterion uses an `llm` grader.
 
-Do not store grader implementation instructions inside individual records when
-they belong in the criterion or grader contract.
+Represent all legitimate correct behaviors. Do not force one canonical answer when several are valid.
 
-## Define field schemas semantically
+Do not add fields the grader or metrics do not use. Never expose `expected` to component execution.
 
-For every field define:
+## Metadata
 
-- path;
-- type;
-- required or optional status;
-- semantic meaning;
-- valid values;
-- relationship to other fields;
-- behavior when omitted;
-- one concise example.
+Optional. Use only for analysis or maintenance, for example:
 
-Avoid unconstrained generic dictionaries when the implementation can use a
-clearer contract.
+```yaml
+metadata:
+  scenario: ambiguous_request
+  source: expert_authored
+  tags: [multi_turn]
+```
 
-## Dataset groups
+Metadata must not affect component execution or grading semantics.
 
-Use only groups that add a distinct maintenance purpose.
+If the grader needs a field, put it in `expected`.
 
-### Baseline
+## Field definitions
 
-Representative normal behavior and the main functional distribution.
+For every `input` and `expected` field define:
 
-A good baseline includes:
+- type or structure;
+- meaning;
+- required/optional;
+- relevant constraints;
+- omission semantics when optional.
 
-- common paths;
-- meaningful variation;
-- both successful and failure-sensitive scenarios;
-- enough diversity to avoid measuring one narrow pattern.
+Do not prescribe implementation-language schemas.
 
-### Corner cases
+## Coverage
 
-Difficult, ambiguous, boundary, adversarial, rare, or structurally unusual
-valid scenarios.
+Define only scenario categories that can expose materially different behavior or grader outcomes.
 
-Corner cases should exercise the criterion, not random malformed data that only
-tests parser resilience.
+Example for `tool_selection`:
 
-### Regression
+```text
+clear tool match
+competing tools
+multiple acceptable tools
+no appropriate tool
+ambiguous request
+```
 
-Scenarios created from known failures. Each record should preserve the exact
-behavior that must not recur.
+Do not apply generic scenario lists mechanically.
 
-Regression datasets should grow from production incidents, user complaints,
-review findings, and previously observed model regressions.
+Specify:
 
-## Scenario design
+- representative cases needed for normal behavior;
+- targeted cases needed for boundaries, ambiguity, known weaknesses, high-consequence behavior, or regressions.
 
-Define the categories the implementation stage must cover, including where
-relevant:
+Do not define metric weighting.
 
-- positive success cases;
-- negative or no-action cases;
-- partial-success cases;
-- multiple-valid-answer cases;
-- ambiguous cases;
-- missing-information cases;
-- conflicting-information cases;
-- boundary cases;
-- high-consequence cases;
-- known regressions.
+## Authoring guidance
 
-## Balance and coverage
+Provide only criterion-specific guidance needed to prevent poor case generation.
 
-Specify dimensions that should not be accidentally dominated, such as:
+Include when relevant:
 
-- intent category;
-- difficulty;
-- input length;
-- number of available options;
-- answerable versus unanswerable;
-- action versus no action;
-- single-turn versus multi-turn;
-- domain category;
-- language, when relevant.
+- realism constraints;
+- important variation dimensions;
+- source of expected truth;
+- required case properties;
+- cases that must be included;
+- constructions that would make the eval trivial or misleading.
 
-The dataset README may describe these dimensions without adding generic metadata
-to every record. Encode only execution- or grading-relevant data in records.
+Example:
 
-## Invalid records
+```text
+- Requests should resemble real router traffic.
+- Available tool combinations must be valid.
+- Acceptable tools must be grounded in the component contract.
+- Avoid wording that reveals the expected tool.
+```
 
-Document examples that should fail dataset validation, such as:
+## Ground truth
 
-- missing `id`, `input`, or `expected`;
-- duplicate IDs;
-- expected references to unavailable entities;
-- incompatible alternatives;
-- expected values that cannot be observed by the grader;
-- fields whose meaning conflicts with the criterion spec.
+Expected values must come from a defensible source:
 
-Invalid data is not component failure.
+- component contract;
+- repository-defined specifications or invariants;
+- product requirements;
+- authoritative domain information;
+- approved expert judgment;
+- confirmed regressions.
 
-## Leakage prevention
+Do not treat observed current implementation behavior as ground truth merely because it exists in the repository.
 
-Expected answers must not influence execution.
+Do not invent expected truth. If required truth is unavailable, record the dependency for dataset implementation.
 
-The future runner should receive only `input`. The grader receives the full
-record and execution artifact.
+## Leakage
 
-Avoid input fields whose names or values reveal the expected answer unless that
-information is genuinely available to the real component.
+Maintain:
 
-## Maintenance contract
+```text
+input    → component
+expected → grader
+metadata → analysis/maintenance
+```
 
-Define when records are added, revised, or removed:
+Never expose `expected` or analysis metadata to component execution.
 
-- add a regression record for meaningful confirmed failures;
-- update records when underlying domain truth changes;
-- preserve stable IDs where scenario identity is unchanged;
-- review expected values when component boundaries change;
-- avoid deleting hard examples merely because they reduce scores.
+## Downstream dataset requirements
+
+The design must define enough information for a future dataset-authoring stage to create concrete cases without inventing semantics:
+
+- input structure or semantics;
+- expected structure or semantics;
+- legitimate alternatives;
+- required scenario coverage;
+- representative vs targeted coverage;
+- ground-truth sources;
+- criterion-specific authoring constraints.
+
+The dataset-authoring stage owns concrete cases, case count, authoring/generation approach, serialization/files, dataset validation, deduplication, balancing mechanics, dataset tooling, and regression curation.
+
+`evals-criterion-implementation` does not own full dataset creation.
